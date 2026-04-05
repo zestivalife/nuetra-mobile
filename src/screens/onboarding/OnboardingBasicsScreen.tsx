@@ -47,46 +47,56 @@ export const OnboardingBasicsScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <Screen scroll>
-      <Text style={styles.title}>Set up your wellness copilot</Text>
-      <Text style={styles.subtitle}>Three quick steps. No clutter, no overwhelm.</Text>
+    <Screen>
+      <View style={styles.body}>
+        <Text style={styles.title}>Set up your wellness copilot</Text>
+        <Text style={styles.subtitle}>Three quick steps. No clutter, no overwhelm.</Text>
 
-      <View style={styles.form}>
-        <TextField label="Name" placeholder="Your name" value={name} onChangeText={setName} />
-        <TextField label="Role" placeholder="Your role" value={role} onChangeText={setRole} />
-        <TextField label="Work hours" placeholder="09:00 - 18:00" value={workHours} onChangeText={setWorkHours} />
+        <View style={styles.form}>
+          <TextField label="Name" placeholder="Your name" value={name} onChangeText={setName} />
+          <TextField label="Role" placeholder="Your role" value={role} onChangeText={setRole} />
+          <TextField label="Work hours" placeholder="09:00 - 18:00" value={workHours} onChangeText={setWorkHours} />
+        </View>
+
+        <Text style={styles.label}>Standard working hours</Text>
+        <View style={styles.options}>
+          {standardWorkHours.map((item) => {
+            const active = workHours === item;
+            return (
+              <Pressable key={item} style={[styles.option, active && styles.optionActive]} onPress={() => setWorkHours(item)}>
+                <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.label}>Biggest challenge</Text>
+        <View style={styles.options}>
+          {challenges.map((item) => {
+            const active = item === biggestChallenge;
+            return (
+              <Pressable key={item} style={[styles.option, active && styles.optionActive]} onPress={() => setBiggestChallenge(item)}>
+                <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
-      <Text style={styles.label}>Standard working hours</Text>
-      <View style={styles.options}>
-        {standardWorkHours.map((item) => {
-          const active = workHours === item;
-          return (
-            <Pressable key={item} style={[styles.option, active && styles.optionActive]} onPress={() => setWorkHours(item)}>
-              <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
-            </Pressable>
-          );
-        })}
+      <View style={styles.footer}>
+        <PrimaryButton title="Continue" onPress={continueNext} />
       </View>
-
-      <Text style={styles.label}>Biggest challenge</Text>
-      <View style={styles.options}>
-        {challenges.map((item) => {
-          const active = item === biggestChallenge;
-          return (
-            <Pressable key={item} style={[styles.option, active && styles.optionActive]} onPress={() => setBiggestChallenge(item)}>
-              <Text style={[styles.optionText, active && styles.optionTextActive]}>{item}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <PrimaryButton title="Continue" onPress={continueNext} />
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
+  body: {
+    flex: 1
+  },
+  footer: {
+    paddingTop: 12
+  },
   title: {
     ...typography.title,
     fontSize: 24,

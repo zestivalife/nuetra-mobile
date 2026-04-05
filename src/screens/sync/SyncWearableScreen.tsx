@@ -13,7 +13,7 @@ import { connectWearable, syncWearableData } from '../../services/wearableServic
 type Props = NativeStackScreenProps<RootStackParamList, 'SyncWearable'>;
 
 export const SyncWearableScreen = ({ navigation }: Props) => {
-  const { devices, selectedDeviceId, setSelectedDeviceId, setDevices, setWellness } = useAppContext();
+  const { devices, selectedDeviceId, setSelectedDeviceId, setDevices, setWellness, addWearableSyncData } = useAppContext();
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,12 +29,13 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
       setError(null);
       setSyncing(true);
       const connected = await connectWearable(selected);
-      const syncedWellness = await syncWearableData();
+      const synced = await syncWearableData(connected);
       setDevices((prev) => prev.map((d) => (d.id === connected.id ? connected : d)));
-      setWellness(syncedWellness);
+      setWellness(synced.wellness);
+      addWearableSyncData(synced.payload);
       navigation.replace('SyncSuccess', { deviceName: connected.model });
     } catch {
-      setError('Unable to sync watch right now. Please retry.');
+      setError('Live wearable sync failed. Please check watch permissions, internet, and try again.');
     } finally {
       setSyncing(false);
     }
@@ -43,6 +44,8 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
   return (
     <Screen scroll>
       <Text style={styles.title}>Sync Your Wearable</Text>
+      <Text style={styles.subTitle}>Universal connector supports Apple, Samsung, Xiaomi, Amazfit, and other wearables.</Text>
+
       <View style={styles.list}>
         {devices.map((device) => {
           const isActive = selectedDeviceId === device.id;
@@ -77,8 +80,13 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   title: {
     ...typography.title,
-    marginBottom: 18,
+    marginBottom: 8,
     marginTop: 6
+  },
+  subTitle: {
+    ...typography.body,
+    fontSize: 14,
+    marginBottom: 16
   },
   list: {
     gap: 10,

@@ -9,19 +9,34 @@ import { useAppContext } from '../../state/AppContext';
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
 export const SplashScreen = ({ navigation }: Props) => {
-  const { onboarding } = useAppContext();
+  const { onboarding, isAuthenticated, assessment, bootstrapped } = useAppContext();
 
   useEffect(() => {
+    if (!bootstrapped) {
+      return;
+    }
+
     const timer = setTimeout(() => {
-      if (onboarding) {
-        navigation.replace('Main');
+      if (!onboarding) {
+        navigation.replace('OnboardingBasics');
         return;
       }
-      navigation.replace('OnboardingBasics');
-    }, 900);
+
+      if (!isAuthenticated) {
+        navigation.replace('SignIn');
+        return;
+      }
+
+      if (!assessment) {
+        navigation.replace('OnboardingAssessment');
+        return;
+      }
+
+      navigation.replace('Main');
+    }, 500);
 
     return () => clearTimeout(timer);
-  }, [navigation, onboarding]);
+  }, [assessment, bootstrapped, isAuthenticated, navigation, onboarding]);
 
   return (
     <Screen>

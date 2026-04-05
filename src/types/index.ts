@@ -9,6 +9,12 @@ export type BurnoutRiskFlag = 'none' | 'watch' | 'alert';
 export type NudgeType = 'break' | 'breathing' | 'hydration' | 'winddown' | 'weekly_insight';
 export type NudgeAction = 'sent' | 'opened' | 'snoozed' | 'dismissed';
 export type ThemeMode = 'dark' | 'light';
+export type AssessmentGoal = 'Reduce Stress' | 'Try AI Therapy' | 'Cope With Trauma' | 'Become Better';
+export type AssessmentGender = 'Male' | 'Female' | 'Prefer not to say';
+export type AssessmentMood = 'Neutral' | 'Low' | 'Positive';
+export type AssessmentHelpHistory = 'Yes' | 'No';
+export type AssessmentPhysicalDistress = 'Yes' | 'No';
+export type AssessmentSleepQuality = 'Excellent' | 'Good' | 'Fair' | 'Poor' | 'Worst';
 
 export type OnboardingProfile = {
   name: string;
@@ -19,6 +25,20 @@ export type OnboardingProfile = {
   calendarPermissionGranted: boolean;
   notificationPermissionGranted: boolean;
   createdAtISO: string;
+};
+
+export type AssessmentProfile = {
+  completedAtISO: string;
+  goal: AssessmentGoal;
+  gender: AssessmentGender;
+  age: number;
+  weightKg: number;
+  mood: AssessmentMood;
+  soughtHelpBefore: AssessmentHelpHistory;
+  physicalDistress: AssessmentPhysicalDistress;
+  sleepQuality: AssessmentSleepQuality;
+  stressLevel: 1 | 2 | 3 | 4 | 5;
+  voiceReflection: string;
 };
 
 export type DailyCheckIn = {
@@ -70,6 +90,28 @@ export type WearableDevice = {
   connected: boolean;
   battery: number;
   lastSyncISO: string;
+};
+
+export type WearableSyncPayload = {
+  deviceId: string;
+  brand: WearableBrand;
+  model: string;
+  provider: string;
+  syncedAtISO: string;
+  source: 'api' | 'mock';
+  metrics: {
+    heartRateAvg: number;
+    sleepHours: number;
+    hydrationLiters: number;
+    focusMinutes: number;
+    breathingMinutes: number;
+    movementMinutes: number;
+  };
+  dataQuality: {
+    confidence: number;
+    isEstimated: boolean;
+    warnings: string[];
+  };
 };
 
 export type WellnessSnapshot = {

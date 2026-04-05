@@ -85,19 +85,11 @@ const ActivityCard = ({ title, subtitle, meta, icon, onPress, isLight }: Activit
 };
 
 export const HomeScreen = () => {
-  const { wellness, selectedDeviceId, devices, mood, setMood, hasCheckedInToday, submitCheckIn, priorityPlan, checkIns, nudges, themeMode, setThemeMode, logout } =
+  const { onboarding, wellness, selectedDeviceId, devices, mood, setMood, priorityPlan, checkIns, nudges, themeMode } =
     useAppContext();
   const navigation = useNavigation<Nav>();
   const isLight = themeMode === 'light';
   const homeGradient = isLight ? (['#F8FBFF', '#EAF1FF'] as const) : (['#4A123F', '#1F214D'] as const);
-  const [checkMoodEmoji, setCheckMoodEmoji] = useState<MoodSelection>('🙂');
-  const [checkEnergy, setCheckEnergy] = useState<1 | 2 | 3 | 4 | 5>(3);
-  const [checkSleep, setCheckSleep] = useState<1 | 2 | 3 | 4 | 5>(3);
-  const [showMorningCheckInPopup, setShowMorningCheckInPopup] = useState(false);
-  const [showCheckInPopup, setShowCheckInPopup] = useState(false);
-  const [showCheckInHistoryPopup, setShowCheckInHistoryPopup] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [latestCheckIn, setLatestCheckIn] = useState<{ mood: number; energy: number; sleepQuality: number } | null>(null);
   const moodAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -113,14 +105,6 @@ export const HomeScreen = () => {
     }).start();
   }, [mood, moodAnim]);
 
-  useEffect(() => {
-    if (!hasCheckedInToday) {
-      setShowMorningCheckInPopup(true);
-      return;
-    }
-    setShowMorningCheckInPopup(false);
-  }, [hasCheckedInToday]);
-
   const moodMessage = useMemo(
     () => moodConfigs.find((item) => item.emoji === mood)?.message ?? '',
     [mood]
@@ -130,8 +114,6 @@ export const HomeScreen = () => {
   const wellnessTags = useMemo(() => wellnessTagsFromSnapshot(wellness), [wellness]);
   const trendDelta = useMemo(() => trendDeltaFromCheckins(checkIns.map((item) => (item.mood + item.energy + item.sleepQuality) / 3)), [checkIns]);
   const pendingNudge = nudges[nudges.length - 1];
-  const recentCheckIns = useMemo(() => [...checkIns].sort((a, b) => b.dateISO.localeCompare(a.dateISO)).slice(0, 7), [checkIns]);
-
   const activities: ActivityCardProps[] = [
     {
       title: 'Focus Mode',
@@ -166,7 +148,7 @@ export const HomeScreen = () => {
   return (
     <Screen scroll contentStyle={styles.screenContent}>
       <View style={styles.headerRow}>
-        <Text style={[styles.greeting, isLight && styles.greetingLight]}>Hi!, Rahul Roy</Text>
+        <Text style={[styles.greeting, isLight && styles.greetingLight]} numberOfLines={1}>Hi!, {onboarding?.name ?? 'Employee'}</Text>
 
         <View style={styles.headerActionsWrap}>
           <View style={[styles.actionsPill, isLight && styles.actionsPillLight]}>
@@ -186,7 +168,7 @@ export const HomeScreen = () => {
             </Pressable>
           </View>
 
-          <Pressable style={[styles.avatar, isLight && styles.avatarLight]} onPress={() => setShowProfileMenu((prev) => !prev)}>
+          <Pressable style={[styles.avatar, isLight && styles.avatarLight]} onPress={() => navigation.navigate('Profile')}>
             <Ionicons name="person" size={26} color={isLight ? '#2C3D60' : '#E7E1FF'} />
           </Pressable>
         </View>
@@ -247,10 +229,6 @@ export const HomeScreen = () => {
           <Text style={[styles.nudgeCopy, isLight && styles.textMutedDark]}>{pendingNudge.body}</Text>
         </View>
       ) : null}
-
-      <Pressable style={styles.viewCheckInsButton} onPress={() => setShowCheckInHistoryPopup(true)}>
-        <Text style={styles.viewCheckInsText}>View Check-ins</Text>
-      </Pressable>
 
       <View style={styles.syncRow}>
         <Text style={[styles.syncLabel, isLight && styles.syncLabelLight]}>{connectedDevice ? `Synced: ${connectedDevice.brand}` : 'Watch not synced'}</Text>
@@ -318,140 +296,6 @@ export const HomeScreen = () => {
       </View>
 
       <View style={styles.bottomSpacer} />
-
-      <Modal visible={showMorningCheckInPopup} animationType="fade" transparent onRequestClose={() => setShowMorningCheckInPopup(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Morning Check-in</Text>
-            <Text style={styles.modalCopy}>3 taps. We’ll do the rest.</Text>
-
-            <Text style={styles.checkInLabel}>Choose your mood for today</Text>
-            <View style={styles.popupMoodRow}>
-              {moodConfigs.map((item) => {
-                const active = checkMoodEmoji === item.emoji;
-                return (
-                  <Pressable key={`popup-${item.emoji}`} style={[styles.popupMoodItem, active && styles.moodItemActive]} onPress={() => setCheckMoodEmoji(item.emoji)}>
-                    <Text style={styles.moodText}>{item.emoji}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.checkInRow}>
-              <Text style={styles.checkInLabel}>Energy</Text>
-              <View style={styles.scaleRow}>
-                {checkInScale.map((value) => (
-                  <Pressable key={`popup-e-${value}`} onPress={() => setCheckEnergy(value)} style={[styles.scaleChip, checkEnergy === value && styles.scaleChipActive]}>
-                    <Text style={styles.scaleChipText}>{value}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.checkInRow}>
-              <Text style={styles.checkInLabel}>Sleep quality</Text>
-              <View style={styles.scaleRow}>
-                {checkInScale.map((value) => (
-                  <Pressable key={`popup-s-${value}`} onPress={() => setCheckSleep(value)} style={[styles.scaleChip, checkSleep === value && styles.scaleChipActive]}>
-                    <Text style={styles.scaleChipText}>{value}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            <Pressable
-              style={styles.modalButton}
-              onPress={() => {
-                const moodScore = checkInMoodMap[checkMoodEmoji];
-                submitCheckIn({
-                  mood: moodScore,
-                  energy: checkEnergy,
-                  sleepQuality: checkSleep
-                });
-                setLatestCheckIn({ mood: moodScore, energy: checkEnergy, sleepQuality: checkSleep });
-                setShowMorningCheckInPopup(false);
-                setShowCheckInPopup(true);
-              }}
-            >
-              <Text style={styles.modalButtonText}>Save check-in</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showCheckInPopup} animationType="fade" transparent onRequestClose={() => setShowCheckInPopup(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Check-in Saved</Text>
-            <Text style={styles.modalCopy}>Great job. You showed up for your health today.</Text>
-            <View style={styles.priorityInlineCard}>
-              <Text style={styles.priorityLabel}>Today’s Priority</Text>
-              <Text style={styles.priorityTitle}>{priorityPlan?.priorityTitle ?? 'Take one small wellbeing action today.'}</Text>
-              <Text style={styles.priorityAction}>{priorityPlan?.priorityAction ?? 'Choose one 2-minute reset from Sessions.'}</Text>
-            </View>
-            {latestCheckIn ? (
-              <Text style={styles.modalMetrics}>
-                Mood {latestCheckIn.mood}/5 • Energy {latestCheckIn.energy}/5 • Sleep {latestCheckIn.sleepQuality}/5
-              </Text>
-            ) : null}
-            <Pressable style={styles.modalButton} onPress={() => setShowCheckInPopup(false)}>
-              <Text style={styles.modalButtonText}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showCheckInHistoryPopup} animationType="fade" transparent onRequestClose={() => setShowCheckInHistoryPopup(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Recent Check-ins</Text>
-            {recentCheckIns.length === 0 ? (
-              <Text style={styles.modalCopy}>No check-ins yet. Start with today.</Text>
-            ) : (
-              <View style={styles.historyList}>
-                {recentCheckIns.map((item) => (
-                  <View key={item.dateISO} style={styles.historyRow}>
-                    <Text style={styles.historyDate}>{item.dateISO.slice(0, 10)}</Text>
-                    <Text style={styles.historyValues}>
-                      M {item.mood} • E {item.energy} • S {item.sleepQuality}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            <Pressable style={styles.modalButton} onPress={() => setShowCheckInHistoryPopup(false)}>
-              <Text style={styles.modalButtonText}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showProfileMenu} animationType="fade" transparent onRequestClose={() => setShowProfileMenu(false)}>
-        <Pressable style={styles.profileMenuBackdrop} onPress={() => setShowProfileMenu(false)}>
-          <Pressable style={styles.profileMenuFloating} onPress={() => {}}>
-            <View style={styles.profileMenuRow}>
-              <Text style={styles.profileMenuLabel}>Light Theme</Text>
-              <Pressable
-                style={[styles.themeSwitch, themeMode === 'light' && styles.themeSwitchActive]}
-                onPress={() => setThemeMode((mode) => (mode === 'dark' ? 'light' : 'dark'))}
-              >
-                <View style={[styles.themeSwitchKnob, themeMode === 'light' && styles.themeSwitchKnobActive]} />
-              </Pressable>
-            </View>
-            <Pressable
-              style={styles.logoutButton}
-              onPress={() => {
-                logout();
-                setShowProfileMenu(false);
-                navigation.navigate('SignIn');
-              }}
-            >
-              <Ionicons name="log-out-outline" size={16} color="#FFD8DF" />
-              <Text style={styles.logoutText}>Log out</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </Screen>
   );
 };

@@ -41,31 +41,44 @@ export const recalculateWellness = (snapshot: WellnessSnapshot): WellnessSnapsho
   const heartRhythmQuality = clamp(1 - Math.abs(snapshot.heartRateAvg - 68) / 24, 0, 1);
 
   const recoveryScore = roundedPercent(
-    0.34 * sleepQuality +
+    0.31 * sleepQuality +
       0.2 * hydrationQuality +
       0.18 * breathingQuality +
       0.14 * moodQuality +
-      0.09 * movementQuality +
-      0.05 * heartRhythmQuality
+      0.1 * movementQuality +
+      0.07 * heartRhythmQuality
   );
 
-  const nourishmentScore = roundedPercent(0.72 * hydrationQuality + 0.28 * sleepQuality);
+  const nourishmentScore = roundedPercent(0.68 * hydrationQuality + 0.32 * sleepQuality);
 
-  const wellnessScore = roundedPercent(
-    0.26 * focusQuality +
-      0.22 * (recoveryScore / 100) +
-      0.18 * movementQuality +
-      0.14 * hydrationQuality +
-      0.12 * breathingQuality +
-      0.08 * moodQuality
+  const stressScore = roundedPercent(
+    0.36 * (1 - moodQuality) +
+      0.24 * (1 - sleepQuality) +
+      0.18 * (1 - breathingQuality) +
+      0.14 * (1 - heartRhythmQuality) +
+      0.08 * (1 - movementQuality)
   );
+
+  const baseWellness =
+    0.18 * focusQuality +
+    0.14 * movementQuality +
+    0.12 * breathingQuality +
+    0.14 * hydrationQuality +
+    0.12 * sleepQuality +
+    0.1 * moodQuality +
+    0.08 * heartRhythmQuality +
+    0.07 * (recoveryScore / 100) +
+    0.05 * (nourishmentScore / 100);
+
+  const stressPenalty = 0.12 * (stressScore / 100);
+  const wellnessScore = roundedPercent(baseWellness - stressPenalty + 0.06);
 
   return {
     ...snapshot,
     recoveryScore,
     nourishmentScore,
     wellnessScore,
-    stressScore: wellnessScore,
+    stressScore,
     hrvStatus: toHrvStatus(snapshot.heartRateAvg)
   };
 };

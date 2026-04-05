@@ -45,27 +45,37 @@ export const OnboardingCalendarScreen = ({ navigation }: Props) => {
 
   return (
     <Screen>
-      <Text style={styles.title}>Connect your calendar</Text>
-      <Text style={styles.subtitle}>We only use your calendar to protect your time and avoid interruptions.</Text>
+      <View style={styles.body}>
+        <Text style={styles.title}>Connect your calendar</Text>
+        <Text style={styles.subtitle}>We only use your calendar to protect your time and avoid interruptions.</Text>
 
-      <View style={styles.list}>
-        {providers.map((provider) => {
-          const active = profile.calendarProvider === provider;
-          return (
-            <Pressable key={provider} style={[styles.option, active && styles.optionActive]} onPress={() => selectProvider(provider)}>
-              <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>{provider}</Text>
-              <Text style={styles.optionCopy}>Connect securely and block nudges during meetings.</Text>
-            </Pressable>
-          );
-        })}
+        <View style={styles.list}>
+          {providers.map((provider) => {
+            const active = profile.calendarProvider === provider;
+            return (
+              <Pressable key={provider} style={[styles.option, active && styles.optionActive]} onPress={() => selectProvider(provider)}>
+                <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>{provider}</Text>
+                <Text style={styles.optionCopy}>Connect securely and block nudges during meetings.</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
-      <PrimaryButton title="Continue" onPress={continueNext} />
+      <View style={styles.footer}>
+        <PrimaryButton title="Continue" onPress={continueNext} />
+      </View>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
+  body: {
+    flex: 1
+  },
+  footer: {
+    paddingTop: 12
+  },
   title: {
     ...typography.title
   },

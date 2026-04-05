@@ -38,30 +38,40 @@ export const OnboardingNotificationsScreen = ({ navigation }: Props) => {
     }
     navigation.reset({
       index: 0,
-      routes: [{ name: 'Main' }]
+      routes: [{ name: 'OnboardingAssessment' }]
     });
   };
 
   return (
     <Screen>
-      <Text style={styles.title}>Smart nudges only</Text>
-      <Text style={styles.subtitle}>We only nudge when it matters.</Text>
+      <View style={styles.body}>
+        <Text style={styles.title}>Smart nudges only</Text>
+        <Text style={styles.subtitle}>We only nudge when it matters.</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Notification Promise</Text>
-        <Text style={styles.cardCopy}>No spam, no guilt. Max 3 nudges/day, never during meetings.</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Notification Promise</Text>
+          <Text style={styles.cardCopy}>No spam, no guilt. Max 3 nudges/day, never during meetings.</Text>
+        </View>
+
+        <Pressable style={styles.permissionButton} onPress={allowNotifications}>
+          <Text style={styles.permissionText}>Allow notifications</Text>
+        </Pressable>
       </View>
 
-      <Pressable style={styles.permissionButton} onPress={allowNotifications}>
-        <Text style={styles.permissionText}>Allow notifications</Text>
-      </Pressable>
-
-      <PrimaryButton title="Finish setup" onPress={complete} />
+      <View style={styles.footer}>
+        <PrimaryButton title="Finish setup" onPress={complete} />
+      </View>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
+  body: {
+    flex: 1
+  },
+  footer: {
+    paddingTop: 12
+  },
   title: {
     ...typography.title
   },
