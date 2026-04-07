@@ -36,6 +36,7 @@ export type RootStackParamList = {
       stressLevel?: number;
       sleepQuality?: number;
       hydration?: number;
+      wellnessScore?: number;
     };
   };
 };

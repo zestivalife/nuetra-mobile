@@ -302,3 +302,268 @@ export const generateNuetraChat = async (
 
   return compact(completion.choices[0]?.message?.content ?? 'I am here. Ask me about any value and I will break it down simply.');
 };
+
+export type TrackerImprovementMetric = {
+  metricKey: string;
+  metricTitle: string;
+  unit: string;
+  values: number[];
+  compareValues?: number[];
+};
+
+export type TrackerImprovementInput = {
+  tab: 'health' | 'wellness';
+  rangeMode: '7D' | '30D';
+  dayLabel: string;
+  compareYesterday: boolean;
+  metrics: TrackerImprovementMetric[];
+  context?: {
+    steps?: number;
+    calories?: number;
+    distanceKm?: number;
+    stressLevel?: number;
+    sleepQuality?: number;
+    hydration?: number;
+    wellnessScore?: number;
+  };
+};
+
+export type TrackerImprovementResult = {
+  summary: string;
+  suggestions: string[];
+  generatedAtISO: string;
+  model: string;
+};
+
+const metricAverage = (values: number[]) => {
+  if (values.length === 0) {
+    return 0;
+  }
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
+};
+
+const trackerFallback = (input: TrackerImprovementInput): TrackerImprovementResult => {
+  const snapshots = input.metrics.map((metric) => {
+    const latest = metric.values[metric.values.length - 1] ?? 0;
+    const previous = metric.values[metric.values.length - 2] ?? latest;
+    const avg = metricAverage(metric.values);
+    const delta = latest - previous;
+    return {
+      metricTitle: metric.metricTitle,
+      latest,
+      unit: metric.unit,
+      avg,
+      delta
+    };
+  });
+
+  const first = snapshots[0];
+  const second = snapshots[1] ?? first;
+
+  return {
+    summary: `${first.metricTitle} is ${first.latest.toFixed(1)} ${first.unit} today (${first.delta >= 0 ? 'up' : 'down'} vs prior), while ${second.metricTitle} is ${second.latest.toFixed(1)} ${second.unit}. Keep one focused micro-action to improve tomorrow's trend.`,
+    suggestions: [
+      `Repeat one 2-minute action before your next work block to improve ${first.metricTitle.toLowerCase()}.`,
+      input.tab === 'health'
+        ? 'Prioritize hydration and sleep timing tonight to improve next-day physical markers.'
+        : 'Protect one deep-work block and one recovery break to stabilize wellness markers.',
+      input.compareYesterday
+        ? 'If tomorrow is lower again, switch to a recovery-first day and reduce cognitive load.'
+        : 'Enable day-over-day compare to verify if this action improves tomorrow scores.'
+    ],
+    generatedAtISO: new Date().toISOString(),
+    model: 'nuetra-fallback-v1'
+  };
+};
+
+export const generateTrackerImprovement = async (
+  input: TrackerImprovementInput
+): Promise<TrackerImprovementResult> => {
+  if (!input.metrics.length) {
+    return {
+      summary: 'No tracker values were available yet. Sync your wearable and complete one session to unlock specific guidance.',
+      suggestions: ['Sync your wearable once.', 'Complete one short session.', 'Re-open tracker for personalized guidance.'],
+      generatedAtISO: new Date().toISOString(),
+      model: 'nuetra-fallback-v1'
+    };
+  }
+
+  const metricsContext = input.metrics.map((metric) => {
+    const latest = metric.values[metric.values.length - 1] ?? 0;
+    const previous = metric.values[metric.values.length - 2] ?? latest;
+    const average = metricAverage(metric.values);
+    const compareAverage = metric.compareValues?.length ? metricAverage(metric.compareValues) : null;
+    return {
+      metricTitle: metric.metricTitle,
+      latest,
+      previous,
+      average: Number(average.toFixed(2)),
+      deltaFromPrevious: Number((latest - previous).toFixed(2)),
+      compareAverage: compareAverage !== null ? Number(compareAverage.toFixed(2)) : null,
+      deltaFromCompare: compareAverage !== null ? Number((latest - compareAverage).toFixed(2)) : null,
+      unit: metric.unit
+    };
+  });
+
+  const content = await callModel(
+    [
+      {
+        role: 'system',
+        content: `You are Nuetra, an elite behavior-change copilot for employee wellness.
+Return ONLY valid JSON object with shape: {"summary":"string","suggestions":["string","string","string"]}.
+CRITICAL: Summary must mention at least 2 metric names with actual values and units.
+Suggestions must be specific to current numbers, short, and action-oriented (2-minute or one-block actions).
+Never use generic wording like "overall stable".`
+      },
+      {
+        role: 'user',
+        content: `Generate personalized tracker guidance.
+Tab: ${input.tab}
+Range mode: ${input.rangeMode}
+Day: ${input.dayLabel}
+Compare yesterday: ${input.compareYesterday}
+Context: ${JSON.stringify(input.context ?? {})}
+Metrics: ${JSON.stringify(metricsContext)}
+Return exactly 1 summary and 3 suggestions.`
+      }
+    ],
+    360
+  );
+
+  if (!content) {
+    return trackerFallback(input);
+  }
+
+  const parsed = safeJsonParse<{ summary?: string; suggestions?: string[] }>(content, {});
+  const summary = compact(parsed.summary ?? '');
+  const suggestions = Array.isArray(parsed.suggestions)
+    ? parsed.suggestions.map((item) => compact(String(item))).filter(Boolean).slice(0, 3)
+    : [];
+
+  const hasNumericSignal = /\d/.test(summary);
+  const includesTwoMetrics = metricsContext.filter((metric) => summary.toLowerCase().includes(metric.metricTitle.toLowerCase())).length >= 2;
+
+  if (!summary || suggestions.length < 2 || !hasNumericSignal || !includesTwoMetrics) {
+    return trackerFallback(input);
+  }
+
+  return {
+    summary,
+    suggestions,
+    generatedAtISO: new Date().toISOString(),
+    model: DEFAULT_MODEL
+  };
+};
+
+export type TrackerMetricCoachingInput = {
+  metricKey: string;
+  metricTitle: string;
+  tab: 'health' | 'wellness';
+  unit: string;
+  values: number[];
+  compareValues?: number[];
+  context?: {
+    dayLabel?: string;
+    stressLevel?: number;
+    sleepQuality?: number;
+    hydration?: number;
+    wellnessScore?: number;
+  };
+};
+
+export type TrackerMetricCoachingBase = {
+  trend: 'improving' | 'stable' | 'declining';
+  score: number;
+  latest: number;
+  average: number;
+  deltaFromPrevious: number;
+  compareDelta: number | null;
+};
+
+export type TrackerMetricCoachingResult = {
+  summary: string;
+  suggestions: string[];
+  model: string;
+};
+
+const trackerMetricFallback = (
+  input: TrackerMetricCoachingInput,
+  base: TrackerMetricCoachingBase
+): TrackerMetricCoachingResult => {
+  const compareText =
+    base.compareDelta !== null
+      ? `${base.compareDelta >= 0 ? '+' : ''}${base.compareDelta.toFixed(1)} ${input.unit} vs compare baseline`
+      : 'no compare baseline available yet';
+
+  return {
+    summary: `${input.metricTitle} is ${base.latest.toFixed(1)} ${input.unit} with a ${base.trend} trend and Nuetra score ${base.score}.`,
+    suggestions: [
+      `Current ${input.metricTitle} moved ${base.deltaFromPrevious >= 0 ? 'up' : 'down'} ${Math.abs(base.deltaFromPrevious).toFixed(1)} ${input.unit} vs yesterday. Run one 2-minute reset before the next work block.`,
+      input.tab === 'health'
+        ? `For next-day improvement, prioritize hydration, sleep timing, and lighter late-evening load. ${compareText}.`
+        : `For next-day improvement, protect one focused work sprint and one decompression break. ${compareText}.`,
+      `If ${input.metricTitle.toLowerCase()} declines again tomorrow, switch to a recovery-first day and open Sessions immediately.`
+    ],
+    model: 'nuetra-fallback-v1'
+  };
+};
+
+export const generateTrackerMetricCoaching = async (
+  input: TrackerMetricCoachingInput,
+  base: TrackerMetricCoachingBase
+): Promise<TrackerMetricCoachingResult> => {
+  const content = await callModel(
+    [
+      {
+        role: 'system',
+        content: `You are Nuetra, a premium behavior-change wellness copilot.
+Return ONLY valid JSON object: {"summary":"string","suggestions":["string","string","string"]}.
+CRITICAL:
+- Summary must include this metric name and numeric value with unit.
+- Suggestions must be specific to the numbers provided, not generic.
+- Mention trend direction and day-over-day movement.
+- Keep suggestions short, practical, and action-oriented.`
+      },
+      {
+        role: 'user',
+        content: `Create coaching for one tracker metric.
+Metric: ${input.metricTitle}
+Tab: ${input.tab}
+Unit: ${input.unit}
+Latest value: ${base.latest}
+Average value: ${base.average}
+Trend: ${base.trend}
+Delta from previous day: ${base.deltaFromPrevious}
+Delta vs compare baseline: ${base.compareDelta}
+Nuetra score: ${base.score}
+Context: ${JSON.stringify(input.context ?? {})}
+Series: ${JSON.stringify(input.values)}
+Compare series: ${JSON.stringify(input.compareValues ?? [])}`
+      }
+    ],
+    260
+  );
+
+  if (!content) {
+    return trackerMetricFallback(input, base);
+  }
+
+  const parsed = safeJsonParse<{ summary?: string; suggestions?: string[] }>(content, {});
+  const summary = compact(parsed.summary ?? '');
+  const suggestions = Array.isArray(parsed.suggestions)
+    ? parsed.suggestions.map((item) => compact(String(item))).filter(Boolean).slice(0, 3)
+    : [];
+
+  const summaryHasMetric = summary.toLowerCase().includes(input.metricTitle.toLowerCase());
+  const summaryHasValue = /\d/.test(summary);
+
+  if (!summary || suggestions.length < 2 || !summaryHasMetric || !summaryHasValue) {
+    return trackerMetricFallback(input, base);
+  }
+
+  return {
+    summary,
+    suggestions,
+    model: DEFAULT_MODEL
+  };
+};

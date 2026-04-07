@@ -28,7 +28,8 @@ export const trackerAnalysisSchema = z.object({
       dayLabel: z.string().optional(),
       stressLevel: z.number().optional(),
       sleepQuality: z.number().optional(),
-      hydration: z.number().optional()
+      hydration: z.number().optional(),
+      wellnessScore: z.number().optional()
     })
     .optional()
 });
@@ -152,12 +153,18 @@ export const generateTrackerAnalysis = (input: z.infer<typeof trackerAnalysisSch
     }
   ];
 
+  const direction = delta >= 0 ? 'up' : 'down';
+  const valueText = `${latest.toFixed(1)} ${input.unit}`;
+  const compareText = compareDelta !== undefined
+    ? `${compareDelta >= 0 ? '+' : ''}${compareDelta.toFixed(1)} ${input.unit} vs compare baseline`
+    : `no compare baseline`;
+
   const suggestions = [
+    `Current ${input.metricTitle} is ${valueText} (${direction} ${Math.abs(delta).toFixed(1)} ${input.unit} vs yesterday). Add one 2-minute intervention before your next work block.`,
     trend === 'declining'
-      ? `Run one 2-minute reset before the next focus block to stabilize ${input.metricTitle.toLowerCase()}.`
-      : `Keep the current rhythm and repeat the same micro-action at the same time tomorrow.`,
-    `Target a ${input.tab === 'health' ? 'sleep + hydration' : 'mood + focus'} boost to improve this metric in the next 24h.`,
-    `If this metric drops for 2 consecutive days, trigger a short intervention session from Sessions.`
+      ? `Trend is declining across this ${input.metricTitle.toLowerCase()} window. Prioritize recovery tonight: hydration + earlier shutdown for better rebound.`
+      : `Trend is ${trend}. Repeat today's strongest routine at the same time tomorrow to reinforce gains in ${input.metricTitle.toLowerCase()}.`,
+    `Quick compare: ${compareText}. If tomorrow is lower again, open Sessions and run a focused reset immediately.`
   ];
 
   const summary =

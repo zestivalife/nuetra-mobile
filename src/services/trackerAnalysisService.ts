@@ -13,6 +13,7 @@ export type TrackerAnalysisInput = {
     stressLevel?: number;
     sleepQuality?: number;
     hydration?: number;
+    wellnessScore?: number;
   };
 };
 
@@ -29,6 +30,38 @@ export type TrackerAnalysisResult = {
   compareDelta: number | null;
   confidence: number;
   factors: Array<{ label: string; impact: number; direction: 'up' | 'down' }>;
+  summary: string;
+  suggestions: string[];
+  generatedAtISO: string;
+  model: string;
+};
+
+export type TrackerSectionMetricInput = {
+  metricKey: string;
+  metricTitle: string;
+  unit: string;
+  values: number[];
+  compareValues?: number[];
+};
+
+export type TrackerSectionImprovementInput = {
+  tab: TrackerTab;
+  rangeMode: '7D' | '30D';
+  dayLabel: string;
+  compareYesterday: boolean;
+  metrics: TrackerSectionMetricInput[];
+  context?: {
+    steps?: number;
+    calories?: number;
+    distanceKm?: number;
+    stressLevel?: number;
+    sleepQuality?: number;
+    hydration?: number;
+    wellnessScore?: number;
+  };
+};
+
+export type TrackerSectionImprovementResult = {
   summary: string;
   suggestions: string[];
   generatedAtISO: string;
@@ -119,9 +152,48 @@ const buildFallbackAnalysis = (input: TrackerAnalysisInput): TrackerAnalysisResu
           ? `${input.metricTitle} is dropping. A short intervention can recover it.`
           : `${input.metricTitle} is stable. One small push can improve it today.`,
     suggestions: [
-      'Schedule one 2-minute reset before your next intense work block.',
-      `Increase ${input.tab === 'health' ? 'sleep consistency and hydration' : 'focus rhythm and mood regulation'} for the next 24 hours.`,
-      'If the metric falls for 2 days in a row, switch to a recovery-first day plan.'
+      `Current ${input.metricTitle} is ${latest.toFixed(1)} ${input.unit} (${delta >= 0 ? 'up' : 'down'} ${Math.abs(delta).toFixed(1)} ${input.unit} vs yesterday). Use one 2-minute intervention before your next work block.`,
+      trend === 'declining'
+        ? `${input.metricTitle} trend is declining. Prioritize a recovery-first routine tonight: hydration, lighter load, and earlier shutdown.`
+        : `${input.metricTitle} trend is ${trend}. Repeat today's strongest habit at the same time tomorrow to lock consistency.`,
+      compareDelta !== null
+        ? `Compare baseline delta is ${compareDelta >= 0 ? '+' : ''}${compareDelta.toFixed(1)} ${input.unit}. If this drops tomorrow, run a quick reset from Sessions.`
+        : 'Enable compare data to unlock stronger day-over-day coaching.'
+    ],
+    generatedAtISO: new Date().toISOString(),
+    model: 'nuetra-fallback-v1'
+  };
+};
+
+const buildFallbackSectionImprovement = (input: TrackerSectionImprovementInput): TrackerSectionImprovementResult => {
+  const metricSnapshots = input.metrics.map((metric) => {
+    const latest = metric.values[metric.values.length - 1] ?? 0;
+    const previous = metric.values[metric.values.length - 2] ?? latest;
+    const delta = latest - previous;
+    return {
+      metricTitle: metric.metricTitle,
+      latest,
+      unit: metric.unit,
+      delta,
+      trend: delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
+    };
+  });
+
+  const first = metricSnapshots[0];
+  const second = metricSnapshots[1] ?? first;
+
+  const summary = `${first.metricTitle} is at ${first.latest.toFixed(1)} ${first.unit} (${first.trend}), while ${second.metricTitle} is ${second.latest.toFixed(1)} ${second.unit}. Focus one small behavior today to lift tomorrow's score.`;
+
+  return {
+    summary,
+    suggestions: [
+      `Start with one 2-minute action before your next work block to improve ${first.metricTitle.toLowerCase()}.`,
+      input.tab === 'health'
+        ? 'Protect sleep and hydration timing tonight to improve tomorrow morning markers.'
+        : 'Lock one deep-focus slot and one decompression break to stabilize wellness trends.',
+      input.compareYesterday
+        ? 'If this trend stays lower than yesterday tomorrow, switch to a recovery-first routine for one day.'
+        : 'Enable Compare Yesterday to track whether your small action produced a measurable change.'
     ],
     generatedAtISO: new Date().toISOString(),
     model: 'nuetra-fallback-v1'
@@ -163,5 +235,35 @@ export const getTrackerAnalysis = async (input: TrackerAnalysisInput): Promise<T
     return (await response.json()) as TrackerAnalysisResult;
   } catch {
     return buildFallbackAnalysis(input);
+  }
+};
+
+export const getTrackerImprovementInsights = async (
+  input: TrackerSectionImprovementInput
+): Promise<TrackerSectionImprovementResult> => {
+  try {
+    const response = await withTimeout(
+      fetch(`${apiBaseUrl}/v1/intelligence/tracker-improvement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(input)
+      }),
+      3800
+    );
+
+    if (!response.ok) {
+      throw new Error(`tracker improvement failed: ${response.status}`);
+    }
+
+    const data = (await response.json()) as TrackerSectionImprovementResult;
+    if (!data.summary || !Array.isArray(data.suggestions) || data.suggestions.length === 0) {
+      return buildFallbackSectionImprovement(input);
+    }
+
+    return data;
+  } catch {
+    return buildFallbackSectionImprovement(input);
   }
 };

@@ -43,7 +43,12 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
 
   return (
     <Screen scroll>
-      <Text style={styles.title}>Sync Your Wearable</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Sync Your Wearable</Text>
+        <Pressable accessibilityRole="button" style={styles.closeButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="close" size={18} color={colors.textPrimary} />
+        </Pressable>
+      </View>
       <Text style={styles.subTitle}>Universal connector supports Apple, Samsung, Xiaomi, Amazfit, and other wearables.</Text>
 
       <View style={styles.list}>
@@ -78,10 +83,27 @@ export const SyncWearableScreen = ({ navigation }: Props) => {
 };
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
   title: {
     ...typography.title,
     marginBottom: 8,
-    marginTop: 6
+    marginTop: 6,
+    flex: 1,
+    paddingRight: 12
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2E2758',
+    borderWidth: 1,
+    borderColor: '#5E5490'
   },
   subTitle: {
     ...typography.body,

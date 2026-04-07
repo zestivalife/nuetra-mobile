@@ -11,7 +11,9 @@ import {
   generateCrossReferenceInsights,
   generateNuetraChat,
   generateNuetraSummary,
-  generateParameterInsight
+  generateParameterInsight,
+  generateTrackerImprovement,
+  generateTrackerMetricCoaching
 } from './nuetra.service.js';
 
 export const intelligenceRouter = Router();
@@ -64,6 +66,33 @@ const chatSchema = z.object({
   reportParameters: z.array(reportParameterSchema).min(1)
 });
 
+const trackerImprovementSchema = z.object({
+  tab: z.enum(['health', 'wellness']),
+  rangeMode: z.enum(['7D', '30D']),
+  dayLabel: z.string().min(2),
+  compareYesterday: z.boolean(),
+  metrics: z.array(
+    z.object({
+      metricKey: z.string().min(2),
+      metricTitle: z.string().min(2),
+      unit: z.string().min(1),
+      values: z.array(z.number()).min(5).max(90),
+      compareValues: z.array(z.number()).optional()
+    })
+  ).min(1).max(8),
+  context: z
+    .object({
+      steps: z.number().optional(),
+      calories: z.number().optional(),
+      distanceKm: z.number().optional(),
+      stressLevel: z.number().optional(),
+      sleepQuality: z.number().optional(),
+      hydration: z.number().optional(),
+      wellnessScore: z.number().optional()
+    })
+    .optional()
+});
+
 intelligenceRouter.post('/priority', (req, res) => {
   const parsed = checkinSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -74,14 +103,49 @@ intelligenceRouter.post('/priority', (req, res) => {
   return res.json(response);
 });
 
-intelligenceRouter.post('/tracker-analysis', (req, res) => {
+intelligenceRouter.post('/tracker-analysis', async (req, res) => {
   const parsed = trackerAnalysisSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
   const response = generateTrackerAnalysis(parsed.data);
-  return res.json(response);
+
+  try {
+    const ai = await generateTrackerMetricCoaching(parsed.data, {
+      trend: response.trend,
+      score: response.score,
+      latest: response.latest,
+      average: response.average,
+      deltaFromPrevious: response.deltaFromPrevious,
+      compareDelta: response.compareDelta
+    });
+
+    return res.json({
+      ...response,
+      summary: ai.summary,
+      suggestions: ai.suggestions,
+      model: ai.model
+    });
+  } catch (error) {
+    console.error('tracker analysis ai error', error);
+    return res.json(response);
+  }
+});
+
+intelligenceRouter.post('/tracker-improvement', async (req, res) => {
+  const parsed = trackerImprovementSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  try {
+    const response = await generateTrackerImprovement(parsed.data);
+    return res.json(response);
+  } catch (error) {
+    console.error('tracker improvement error', error);
+    return res.status(500).json({ error: 'failed_to_generate_tracker_improvement' });
+  }
 });
 
 intelligenceRouter.post('/reports/summary', async (req, res) => {

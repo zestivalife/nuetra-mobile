@@ -8,7 +8,11 @@ import { Card } from '../../components/Card';
 import { colors, radius, spacing, typography } from '../../design/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../state/AppContext';
-import { TrackerTab } from '../../services/trackerAnalysisService';
+import {
+  getTrackerImprovementInsights,
+  TrackerSectionImprovementResult,
+  TrackerTab
+} from '../../services/trackerAnalysisService';
 import { toDayKey } from '../../utils/date';
 
 type RangeMode = '7D' | '30D';
@@ -239,6 +243,17 @@ export const TrackerScreen = () => {
   const [rangeMode, setRangeMode] = useState<RangeMode>('7D');
   const [selectedDay, setSelectedDay] = useState(6);
   const [compareYesterday, setCompareYesterday] = useState(false);
+  const [trackerInsightsLoading, setTrackerInsightsLoading] = useState(false);
+  const [trackerInsights, setTrackerInsights] = useState<TrackerSectionImprovementResult>({
+    summary: "Nuetra is preparing personalized guidance for today's tracker values.",
+    suggestions: [
+      'Keep a consistent routine for your next work block.',
+      'Use Compare Yesterday to monitor day-over-day impact.',
+      'Tap a metric card to view deeper trend details.'
+    ],
+    generatedAtISO: new Date().toISOString(),
+    model: 'nuetra-seed-v1'
+  });
   const contentAnim = useRef(new Animated.Value(1)).current;
 
   const days = useMemo<DayData[]>(() => {
@@ -297,7 +312,7 @@ export const TrackerScreen = () => {
     }).start();
   }, [activeTab, selectedDay, contentAnim]);
 
-  const summaryText = useMemo(() => {
+  const fallbackSummaryText = useMemo(() => {
     if (!compareYesterday) {
       return 'Tap any card for full AI analysis and improvement guidance.';
     }
@@ -413,6 +428,59 @@ export const TrackerScreen = () => {
 
   const metrics = activeTab === 'health' ? healthMetrics : wellnessMetrics;
 
+  useEffect(() => {
+    let alive = true;
+
+    const loadInsights = async () => {
+      setTrackerInsightsLoading(true);
+      try {
+        const result = await getTrackerImprovementInsights({
+          tab: activeTab,
+          rangeMode,
+          dayLabel: `${selected.dayLabel} ${selected.dateNum}`,
+          compareYesterday,
+          metrics: metrics.map((metric) => ({
+            metricKey: metric.key,
+            metricTitle: metric.title,
+            unit: metric.unit,
+            values: metric.values,
+            compareValues: metric.compareValues
+          })),
+          context: {
+            steps: selected.steps,
+            calories: selected.calories,
+            distanceKm: selected.distanceKm,
+            stressLevel: selected.stressLoad[selected.stressLoad.length - 1],
+            sleepQuality: selected.sleepScoreBars[selected.sleepScoreBars.length - 1],
+            hydration: wellness.hydrationLiters,
+        wellnessScore: wellness.wellnessScore
+      }
+        });
+
+        if (alive) {
+          setTrackerInsights(result);
+        }
+      } catch {
+        if (alive) {
+          setTrackerInsights((current) => ({
+            ...current,
+            summary: fallbackSummaryText
+          }));
+        }
+      } finally {
+        if (alive) {
+          setTrackerInsightsLoading(false);
+        }
+      }
+    };
+
+    loadInsights();
+
+    return () => {
+      alive = false;
+    };
+  }, [activeTab, compareYesterday, fallbackSummaryText, rangeMode, selectedDay, wellness.hydrationLiters, wellness.wellnessScore]);
+
   const openDetail = (metric: MetricConfig) => {
     navigation.navigate('TrackerDetail', {
       metricKey: metric.key,
@@ -428,7 +496,8 @@ export const TrackerScreen = () => {
         dayLabel: `${selected.dayLabel} ${selected.dateNum}`,
         stressLevel: selected.stressLoad[selected.stressLoad.length - 1],
         sleepQuality: selected.sleepScoreBars[selected.sleepScoreBars.length - 1],
-        hydration: wellness.hydrationLiters
+        hydration: wellness.hydrationLiters,
+        wellnessScore: wellness.wellnessScore
       }
     });
   };
@@ -549,9 +618,29 @@ export const TrackerScreen = () => {
       </Animated.View>
 
       <Card style={[styles.insightCard, !isLight && styles.insightCardDark]}>
-        <Text style={[styles.insightTitle, !isLight && styles.insightTitleDark]}>{activeTab === 'health' ? 'Health Insight' : 'Wellness Insight'}</Text>
-        <Text style={[styles.insightCopy, !isLight && styles.insightCopyDark]}>{summaryText}</Text>
-        <Text style={[styles.insightSub, !isLight && styles.insightSubDark]}>Range: {rangeMode} • Day: {selected.dayLabel} {selected.dateNum}</Text>
+        <Text style={[styles.insightTitle, !isLight && styles.insightTitleDark]}>Nuetra Insight</Text>
+        <Text style={[styles.insightCopy, !isLight && styles.insightCopyDark]}>
+          {trackerInsightsLoading ? "Nuetra is analyzing today's trends..." : trackerInsights.summary || fallbackSummaryText}
+        </Text>
+        <Text style={[styles.insightSub, !isLight && styles.insightSubDark]}>
+          Range: {rangeMode} • Day: {selected.dayLabel} {selected.dateNum}
+        </Text>
+      </Card>
+
+      <Card style={[styles.insightCard, !isLight && styles.insightCardDark, styles.suggestionCard]}>
+        <Text style={[styles.insightTitle, !isLight && styles.insightTitleDark]}>Improvement Suggestions</Text>
+        <View style={styles.suggestionList}>
+          {(trackerInsights.suggestions.length ? trackerInsights.suggestions : [
+            'Protect one micro-break before your next work block.',
+            'Use Compare Yesterday to track measurable daily change.',
+            'Tap any metric card for a deeper trend explanation.'
+          ]).slice(0, 3).map((item, index) => (
+            <View key={item + '-' + index} style={styles.suggestionRow}>
+              <View style={[styles.suggestionDot, { backgroundColor: sectionHighlight }]} />
+              <Text style={[styles.suggestionText, !isLight && styles.suggestionTextDark]}>{item}</Text>
+            </View>
+          ))}
+        </View>
       </Card>
     </Screen>
   );
@@ -862,6 +951,33 @@ const styles = StyleSheet.create({
     color: '#3D4152'
   },
   insightCopyDark: {
+    color: '#D2CCE9'
+  },
+  suggestionCard: {
+    marginTop: spacing.xs
+  },
+  suggestionList: {
+    gap: 8
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8
+  },
+  suggestionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6
+  },
+  suggestionText: {
+    ...typography.body,
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#3D4152'
+  },
+  suggestionTextDark: {
     color: '#D2CCE9'
   },
   insightSub: {
